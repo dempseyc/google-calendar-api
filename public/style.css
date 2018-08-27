@@ -1,0 +1,10 @@
+.clld-calendar {
+  width: 90%;
+  height: 90vh;
+  margin: auto;
+  border: 2px solid black;
+}
+
+.red {
+  background-color: red;
+}
