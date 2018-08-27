@@ -15,12 +15,8 @@ app.get('/', function (req, res) {
 });
 
 function requestCalendar (calID) {
-    // sanity check
-    // let url = "http://www.google.com";
-    // let url = "https://www.balbalbakdjfkj.com";
 
     let url = "http://calendar.google.com/calendar/ical/"+calID+"%40group.calendar.google.com/public/basic.ics";
-    // let url = "https://calendar.google.com/calendar/ical/hhc1mfvhcajj77n5jcte1gq50s%40group.calendar.google.com/public/basic.ics";
     
     return new Promise(function(resolve,reject) {
         request({ 
@@ -28,20 +24,30 @@ function requestCalendar (calID) {
             uri: url,
             gzip: true
         }, function (error, response, body) {
-        // body is the decompressed response body
-        // console.log('server encoded the data as: ' + (response.headers['content-encoding'] || 'identity'))
-        // console.log('the decoded data is: ' + body)
         resolve(response)
         });
 
     });
 }
 
+// request takes 3 query params: calid, timespan, startdate, calid is required
 app.get('/cal', function (req,res) {
-    let calID = "hhc1mfvhcajj77n5jcte1gq50s";
+
+    let today = new Date();
+    let date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+    // let calID = "hhc1mfvhcajj77n5jcte1gq50s";
+    let calID = req.query.calid;
+
+    if (!calID) { res.send('please supply calid in query'); }
+
+    let timeSpan = req.query.timespan || '4m' ;
+    let startDate = req.query.startdate || date ;
     requestCalendar(calID)
       .then(function(GoogleResponse){
         let fGoogleResponse = {
+            "id": calID,
+            "timespan": timeSpan,
+            "startdate": startDate,
             "status": GoogleResponse.statusCode,
             "message": GoogleResponse.statusMessage,
             "ics": GoogleResponse.body
