@@ -1,15 +1,8 @@
-// check github working
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 const request = require('request');
 const ical2json = require('ical2json');
-// RRule, RRuleSet, rrulestr
-const rrule = require('rrule');
-const RRule = rrule.RRule;
-const RRuleSet = rrule.RRuleSet;
-
-const rruleSet = new RRuleSet();
 
 app.use(express.static(__dirname + '/public'));
 
