@@ -3,8 +3,31 @@ const app = express();
 const port = process.env.PORT || 3000;
 const request = require('request');
 const ical2json = require('ical2json');
+const ipfilter = require('express-ipfilter').IpFilter;
+const IpDeniedError = require('express-ipfilter').IpDeniedError;
+
+// Whitelist the following IPs
+var ips = ['127.0.0.1'];
 
 app.use(express.static(__dirname + '/public'));
+app.use(ipfilter(ips, {mode: 'allow'}));
+
+if (app.get('env') === 'development') {
+  app.use(function(err, req, res, next) {
+    console.log('Error handler', err);
+    if(err instanceof IpDeniedError){
+      res.status(401);
+    }else{
+      res.status(err.status || 500);
+    }
+
+    res.render('error', {
+      message: 'You shall not pass',
+      error: err
+    });
+    next();
+  });
+}
 
 app.use(function (req, res, next) {
     res.header('Content-Type', 'application/json');
@@ -47,20 +70,7 @@ let setEndDate = (startDate,tSpan) => {
     return startDate;
 };
 
-function processData(data, startDate, endDate) {
-    let events = data.ics.VCALENDAR.VEVENT;
-    
-    // convert dates from data to js Dates with Date(Date.utc)
-    // function for that
-
-    //-< is or isn't recurring
-    //-< is or isn't after start date
-    //-< break out recurring ? is before end date
-    //-- add to queue
-    // convert dates to iso format
-
-    return data;
-}
+// http://127.0.0.1:3000/cal?calid=hhc1mfvhcajj77n5jcte1gq50s
 
 // request takes 3 query params: calid, timespan, startdate, calid is required
 app.get('/cal', function (req,res) {
@@ -81,7 +91,6 @@ app.get('/cal', function (req,res) {
     requestCalendar(calID)
       .then(function(GoogleResponse){
         let rawJSONdata = ical2json.convert(GoogleResponse.body);
-        let processedData = processData(rawJSONdata);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,
@@ -89,7 +98,7 @@ app.get('/cal', function (req,res) {
             "startdate": startDate.toISOString(),
             "status": GoogleResponse.statusCode,
             "message": GoogleResponse.statusMessage,
-            "ics": processedData
+            "ics": rawJSONdata
         }
         let json = JSON.stringify(fGoogleResponse);
         res.send(json);
