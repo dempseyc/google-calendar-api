@@ -77,8 +77,6 @@ let extractRRULE = (rrule, eventdate) => {
     return rruleObj;
 };
 
-// i don't like how un-functional this is, mutating the obj
-/////////////////  error cannont read property rrule of undefined.
 let currItemsRRextracted = (items, eventdate) => {
     let rrextracted = items.map( (item) => {
         if (item.RRULE) {
@@ -89,7 +87,7 @@ let currItemsRRextracted = (items, eventdate) => {
     return rrextracted;
 };
 
-let filterData = (JSONdata, earliestdatefilter, now, latestdatefilter, returnCount) => {
+let filterByEarliest = (JSONdata, earliestdatefilter, now, latestdatefilter, returnCount) => {
     let items = JSONdata.VCALENDAR[0].VEVENT;
     // console.log(items, "in fd");
     let currItems = items.filter( (item) => {
@@ -99,12 +97,16 @@ let filterData = (JSONdata, earliestdatefilter, now, latestdatefilter, returnCou
             return true;
         }
     });
+    return currItems;
+};  // end filterByEarliest
 
-    let newJSONdata = currItemsRRextracted(currItems);
+let processData = (veventList) => {
+    //filter by earliest
+    //extrapolate from rrrules
+    //set up buckets by # limit
+    //return first bucket
+};
 
-    return newJSONdata;
-
-};  // end filterData
 
 // http://127.0.0.1:3000/cal?calid=hhc1mfvhcajj77n5jcte1gq50s
 
@@ -128,7 +130,7 @@ app.get('/cal', function (req,res) {
       .then(function(GoogleResponse){
         let JSONdata = ical2json.convert(GoogleResponse.body);
         // console.log(JSONdata.VCALENDAR[0].VEVENT, "in reqCal");
-        let filteredJSONdata = filterData(JSONdata);
+        let filteredJSONdata = processData(JSONdata);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,
