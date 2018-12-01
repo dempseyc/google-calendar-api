@@ -66,34 +66,45 @@ let parseYYYYMMDD = (yyyymmdd) => {
     return date;
 }
 
-let setLatestDateFilter = (earliestdatefilter,tSpan) => {
-    // not implemented
-    // tSpan is obj with properties 'unit' and 'number'  like '4M'
-    return earliestdatefilter;
-};
+// let setLatestDateFilter = (earliestdatefilter,tSpan) => {
+//     // not implemented
+//     // tSpan is obj with properties 'unit' and 'number'  like '4M'
+//     return earliestdatefilter;
+// };
 
-let extractRRULE = (rrule) => {
-    let rruleObj = rrulestr(`${efdate}\n${rrule}`);
+let extractRRULE = (rrule, eventdate) => {
+    let rruleObj = rrulestr(`${eventdate}\n${rrule}`);
     return rruleObj;
 };
 
-let filterData = (JSONdata, earliestdatefilter,now,latestdatefilter,returnCount) => {
-    // console.log(JSONdata.VEVENT); // undefined
+// i don't like how un-functional this is, mutating the obj
+/////////////////  error cannont read property rrule of undefined.
+let currItemsRRextracted = (items, eventdate) => {
+    let rrextracted = items.map( (item) => {
+        if (item.RRULE) {
+            item.RRULE = extractRRULE(item.RRULE, eventdate);
+        }
+        return item;
+    })
+    return rrextracted;
+};
+
+let filterData = (JSONdata, earliestdatefilter, now, latestdatefilter, returnCount) => {
     let items = JSONdata.VCALENDAR[0].VEVENT;
-    let currItems = items.map( (item) => {
-        if(!item.RRULE && earliestdatefilter>=now) {
+    // console.log(items, "in fd");
+    let currItems = items.filter( (item) => {
+        if(!item.RRULE && earliestdatefilter<=now) {
             return false;
+        } else {
+            return true;
         }
     });
-    let currItemsRRextracted = currItems.map( (item) => {
-        if (currItems.RRULE) {
-            item.RRULE = extractRRULE(item.RRULE);
-        }
-    });
-    let newJSONdata = JSONdata;
-    newJSONdata.VEVENT = currItemsRRextracted;
+
+    let newJSONdata = currItemsRRextracted(currItems);
+
     return newJSONdata;
-}
+
+};  // end filterData
 
 // http://127.0.0.1:3000/cal?calid=hhc1mfvhcajj77n5jcte1gq50s
 
@@ -111,12 +122,12 @@ app.get('/cal', function (req,res) {
         unit: timeSpan.charAt(timeSpan.length-1),
         number: Number(timeSpan.slice(0,timeSpan.length-1))
     };
-    let latestdatefilter = setLatestDateFilter(earliestdatefilter,tSpan);
+    // let latestdatefilter = setLatestDateFilter(earliestdatefilter,tSpan);
 
     requestCalendar(calID)
       .then(function(GoogleResponse){
         let JSONdata = ical2json.convert(GoogleResponse.body);
-        console.log(JSONdata.VCALENDAR[0].VEVENT, "in reqCal");
+        // console.log(JSONdata.VCALENDAR[0].VEVENT, "in reqCal");
         let filteredJSONdata = filterData(JSONdata);
         let fGoogleResponse = {
             "id": calID,
