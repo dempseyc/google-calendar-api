@@ -7,10 +7,10 @@ const ipfilter = require('express-ipfilter').IpFilter;
 const IpDeniedError = require('express-ipfilter').IpDeniedError;
 const rrulestr = require('rrule').rrulestr;
 
+app.use(express.static(__dirname + '/public'));
+
 // Whitelist the following IPs
 var ips = ['127.0.0.1'];
-
-app.use(express.static(__dirname + '/public'));
 app.use(ipfilter(ips, {mode: 'allow'}));
 
 if (app.get('env') === 'development') {
@@ -30,10 +30,11 @@ if (app.get('env') === 'development') {
   });
 }
 
-app.use(function (req, res, next) {
-    res.header('Content-Type', 'application/json');
-    next();
-});
+// // not sure this is necessary
+// app.use(function (req, res, next) {
+//     res.header('Content-Type', 'application/json');
+//     next();
+// });
 
 app.get('/', function (req, res) {
     res.sendFile(__dirname + '/index.html');
@@ -72,7 +73,7 @@ let parseYYYYMMDD = (yyyymmdd) => {
 //     return earliestdatefilter;
 // };
 
-let extractRRULE = (rrule, eventdate) => {
+let extractRRULEobj = (rrule, eventdate) => {
     let rruleObj = rrulestr(`${eventdate}\n${rrule}`);
     return rruleObj;
 };
@@ -87,10 +88,9 @@ let currItemsRRextracted = (items, eventdate) => {
     return rrextracted;
 };
 
-let filterByEarliest = (JSONdata, earliestdatefilter, now, latestdatefilter, returnCount) => {
-    let items = JSONdata.VCALENDAR[0].VEVENT;
+let filterByEarliest = (veventData, earliestdatefilter, now, latestdatefilter, returnCount) => {
     // console.log(items, "in fd");
-    let currItems = items.filter( (item) => {
+    let currItems = veventData.filter( (item) => {
         if(!item.RRULE && earliestdatefilter<=now) {
             return false;
         } else {
@@ -100,24 +100,30 @@ let filterByEarliest = (JSONdata, earliestdatefilter, now, latestdatefilter, ret
     return currItems;
 };  // end filterByEarliest
 
-let processData = (veventList) => {
+let processData = (JSONdata) => {
+    let items = JSONdata.VCALENDAR[0].VEVENT; // should be array
     //filter by earliest
     //extrapolate from rrrules
     //set up buckets by # limit
     //return first bucket
+    let newVeventList = filterByEarliest(items);
+    JSONdata.VCALENDAR[0].VEVENT = newVeventList;
+    return JSONdata;
 };
-
 
 // http://127.0.0.1:3000/cal?calid=hhc1mfvhcajj77n5jcte1gq50s
 
-// request takes 3 query params: calid, timespan, earliestdatefilter, calid is required
+// request takes 4 query params: calid(required), earliestdatefilter (default today), 
+// timespan (default '4m'), countlimit * not yet implemented
 app.get('/cal', function (req,res) {
     // let calID = "hhc1mfvhcajj77n5jcte1gq50s";
 
     let today = new Date();
     let todayStr = today.toISOString();
     let calID = req.query.calid;
+
     if (!calID) { res.send('please supply calid in query'); }
+
     let earliestdatefilter = req.query.earliestdatefilter ? parseYYYYMMDD(req.query.earliestdatefilter) : today;
     let timeSpan = req.query.timespan || '4m' ;
     let tSpan = {
@@ -127,18 +133,18 @@ app.get('/cal', function (req,res) {
     // let latestdatefilter = setLatestDateFilter(earliestdatefilter,tSpan);
 
     requestCalendar(calID)
+
       .then(function(GoogleResponse){
-        let JSONdata = ical2json.convert(GoogleResponse.body);
-        // console.log(JSONdata.VCALENDAR[0].VEVENT, "in reqCal");
-        let filteredJSONdata = processData(JSONdata);
+        let rawJSONdata = ical2json.convert(GoogleResponse.body);
+        let processedJSONdata = processData(rawJSONdata);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,
-            "timespan": timeSpan,
+            "timespan": tSpan,
             "earliestdatefilter": earliestdatefilter.toISOString(),
             "status": GoogleResponse.statusCode,
             "message": GoogleResponse.statusMessage,
-            "ics": filteredJSONdata
+            "calData": processedJSONdata
         }
         let json = JSON.stringify(fGoogleResponse);
         res.send(json);
