@@ -6,6 +6,7 @@ const ical2json = require('ical2json');
 const ipfilter = require('express-ipfilter').IpFilter;
 const IpDeniedError = require('express-ipfilter').IpDeniedError;
 const rrulestr = require('rrule').rrulestr;
+const CALMAKER = require('./calMaker');
 
 app.use(express.static(__dirname + '/public'));
 
@@ -136,7 +137,7 @@ app.get('/cal', function (req,res) {
 
       .then(function(GoogleResponse){
         let rawJSONdata = ical2json.convert(GoogleResponse.body);
-        let processedJSONdata = processData(rawJSONdata);
+        let processedJSONdata = CALMAKER.processData(rawJSONdata);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,

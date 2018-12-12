@@ -1,43 +1,50 @@
 const rrulestr = require('rrule').rrulestr;
+const { DateTime } = require('luxon');
 
-let CALMAKER = {
+class CALMAKER {
 
-    myNum: undefined,
+    constructor() {
+        this.myNum = 9;
+        this.vevent = undefined;
+        this.bucketDefinitions = undefined;
+    }
 
-    vevent: undefined,
-    bucketDefinitions: undefined,
-
-    funcForTesting: (num1,num2) => {
+    methForTesting (num1,num2) {
         return num1+num2;
-    },
+    }
 
-    funcWithThisForTesting: (num) => {
-        this.myNum = num;
+    methWithThisForTesting () {
         return this.myNum;
-    },
+    }
+
+    meth2WithThisForTesting (num) {
+        this.myNum = num;
+        let result = this.methForTesting(1,this.myNum);
+        return result;
+    }
 
     // setLatestDateFilter: (earliestdatefilter,tSpan) => {
     //     // not implemented
-    //     // tSpan is obj with properties 'unit' and 'number'  like '4M'
+    //     // tSpan is obj with properties 'unit' and 'number'
     //     return earliestdatefilter;
     // },
 
-    extractRRULEobj: (rrule, eventdate) => {
+    extractRRULEobj (rrule, eventdate) {
         let rruleObj = rrulestr(`${eventdate}\n${rrule}`);
         return rruleObj;
-    },
+    }
 
-    currItemsRRextracted: (items, eventdate) => {
+    currItemsRRextracted (items, eventdate) {
         let rrextracted = items.map( (item) => {
             if (item.RRULE) {
-                item.RRULE = extractRRULE(item.RRULE, eventdate);
+                item.RRULE = this.extractRRULE(item.RRULE, eventdate);
             }
             return item;
         })
         return rrextracted;
-    },
+    }
 
-    filterByEarliest: (veventData, earliestdatefilter, now, latestdatefilter, returnCount) => {
+    filterByEarliest (veventData, earliestdatefilter, now, latestdatefilter, returnCount) {
         // console.log(items, "in fd");
         let currItems = veventData.filter( (item) => {
             if(!item.RRULE && earliestdatefilter<=now) {
@@ -47,19 +54,19 @@ let CALMAKER = {
             }
         });
         return currItems;
-    },  // end filterByEarliest
+    }  // end filterByEarliest
 
-    processData: (JSONdata) => {
+    processData (JSONdata) {
         let items = JSONdata.VCALENDAR[0].VEVENT; // should be array
         //filter by earliest
         //extrapolate from rrrules
         //set up buckets by # limit
         //return first bucket
-        let newVeventList = filterByEarliest(items);
+        let newVeventList = this.filterByEarliest(items);
         JSONdata.VCALENDAR[0].VEVENT = newVeventList;
         return JSONdata;
     }
 
 }
 
-module.exports = CALMAKER;
+module.exports = new CALMAKER();
