@@ -60,7 +60,7 @@ let prependZero = (numStr) => {
     return numStr<10 ? '0'+String(numStr) : String(numStr);
 };
 
-let parseYYYYMMDD = (yyyymmdd) => {
+let parseYYYYMMDDtoJSDate = (yyyymmdd) => {
     let y = yyyymmdd.slice(0,4);
     let m = yyyymmdd.slice(4,6);
     let d = yyyymmdd.slice(6);
@@ -68,76 +68,37 @@ let parseYYYYMMDD = (yyyymmdd) => {
     return date;
 }
 
-// let setLatestDateFilter = (earliestdatefilter,tSpan) => {
-//     // not implemented
-//     // tSpan is obj with properties 'unit' and 'number'  like '4M'
-//     return earliestdatefilter;
-// };
-
-let extractRRULEobj = (rrule, eventdate) => {
-    let rruleObj = rrulestr(`${eventdate}\n${rrule}`);
-    return rruleObj;
-};
-
-let currItemsRRextracted = (items, eventdate) => {
-    let rrextracted = items.map( (item) => {
-        if (item.RRULE) {
-            item.RRULE = extractRRULE(item.RRULE, eventdate);
-        }
-        return item;
-    })
-    return rrextracted;
-};
-
-let filterByEarliest = (veventData, earliestdatefilter, now, latestdatefilter, returnCount) => {
-    // console.log(items, "in fd");
-    let currItems = veventData.filter( (item) => {
-        if(!item.RRULE && earliestdatefilter<=now) {
-            return false;
-        } else {
-            return true;
-        }
-    });
-    return currItems;
-};  // end filterByEarliest
-
-let processData = (JSONdata) => {
-    let items = JSONdata.VCALENDAR[0].VEVENT; // should be array
-    //filter by earliest
-    //extrapolate from rrrules
-    //set up buckets by # limit
-    //return first bucket
-    let newVeventList = filterByEarliest(items);
-    JSONdata.VCALENDAR[0].VEVENT = newVeventList;
-    return JSONdata;
-};
-
 // http://127.0.0.1:3000/cal?calid=hhc1mfvhcajj77n5jcte1gq50s
 
 // request takes 4 query params: calid(required), earliestdatefilter (default today), 
-// timespan (default '4m'), countlimit * not yet implemented
+// timespan (default '4m'), limit * not yet implemented
 app.get('/cal', function (req,res) {
     // let calID = "hhc1mfvhcajj77n5jcte1gq50s";
 
-    let today = new Date();
-    let todayStr = today.toISOString();
+    let todayJS = new Date();
+    // let todayStr = today.toISOString();
     let calID = req.query.calid;
 
     if (!calID) { res.send('please supply calid in query'); }
 
-    let earliestdatefilter = req.query.earliestdatefilter ? parseYYYYMMDD(req.query.earliestdatefilter) : today;
+    // will be a JS Date
+    let earliestdatefilter = req.query.earliestdatefilter ? parseYYYYMMDDtoJSDate(req.query.earliestdatefilter) : todayJS;
+    
     let timeSpan = req.query.timespan || '4m' ;
     let tSpan = {
         unit: timeSpan.charAt(timeSpan.length-1),
         number: Number(timeSpan.slice(0,timeSpan.length-1))
     };
+
+    let limit = Number(req.query.limit);
+
     // let latestdatefilter = setLatestDateFilter(earliestdatefilter,tSpan);
 
     requestCalendar(calID)
 
       .then(function(GoogleResponse){
         let rawJSONdata = ical2json.convert(GoogleResponse.body);
-        let processedJSONdata = CALMAKER.processData(rawJSONdata);
+        let processedJSONdata = CALMAKER.processData(rawJSONdata,earliestdatefilter,tSpan,limit);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,
