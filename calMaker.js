@@ -104,8 +104,8 @@ class CALMAKER {
         return earlydatefilter;
     }
 
-    extractRRULEobj (rrule, eventdate) {
-        let rruleObj = rrulestr(`${eventdate}\n${rrule}`);
+    extractRRULEobj (RRULEstr) {
+        let rruleObj = rrulestr(RRULEstr);
         return rruleObj;
     }
 
@@ -174,14 +174,30 @@ class CALMAKER {
 
         // // extrapolate from rrules.
         // for items with rrules, create rruleObj.
+        let itemsWithRRuleObjs = itemsFilteredByEarly.map( (item) => {
+            let item2 = {};
+            if (item.RRULEstr) {
+                item2.rruleObj = this.extractRRULEobj(item.RRULEstr);
+            }
+            else if (item.RRULE) {
+                console.log('RRULE not handled');
+            }
+            let rruleObjCreatedItem = Object.assign(item, item2);
+            return rruleObjCreatedItem;
+        });
+
+        // might need a combinator for one-offs and rrule items HERE
+
         // filter out those with count or until which do not reach today.
+        // let itemsRRuleNotEndingBeforeToday = itemsWithRRuleObjs
+            
         // with the rest, whether they are infinite or do reach today, include them,
         //  applying the timespan/latedate filter.
         // we need some helpers:
         // * get last occurance of those which reoccur.  how does it compare to latedate filter?
         // * get slice of those which are infinite.  compare to early and latedate filter.
 
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsFilteredByEarly;
+        rawJSONdata.VCALENDAR[0].VEVENT = itemsWithRRuleObjs;
         return rawJSONdata;
     }
 
