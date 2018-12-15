@@ -60,37 +60,37 @@ let prependZero = (numStr) => {
     return numStr<10 ? '0'+String(numStr) : String(numStr);
 };
 
-let parseYYYYMMDDtoJSDate = (yyyymmdd) => {
+let YYYYMMDDtoJSDate = (yyyymmdd) => {
     let y = yyyymmdd.slice(0,4);
     let m = yyyymmdd.slice(4,6);
     let d = yyyymmdd.slice(6);
-    let date = new Date(Date.UTC(y,m,d));
+    let date = new Date(y,m,d);
     return date;
 }
 
 // http://127.0.0.1:3000/cal?calid=hhc1mfvhcajj77n5jcte1gq50s
 
 // request takes 4 query params: calid(required), earliestdatefilter (default today), 
-// timespan (default '4m'), limit * not yet implemented
+// timespan (default '4m'), limit (default 50)
 app.get('/cal', function (req,res) {
     // let calID = "hhc1mfvhcajj77n5jcte1gq50s";
 
-    let todayJS = new Date();
-    // let todayStr = today.toISOString();
+    let todayJSDate = new Date();
+    let todayStr = todayJSDate.toISOString();
     let calID = req.query.calid;
 
     if (!calID) { res.send('please supply calid in query'); }
 
     // will be a JS Date
-    let earliestdatefilter = req.query.earliestdatefilter ? parseYYYYMMDDtoJSDate(req.query.earliestdatefilter) : todayJS;
-    
+    let earliestdatefilter = req.query.earliestdatefilter ? YYYYMMDDtoJSDate(req.query.earliestdatefilter) : todayJSDate;
+    let locale = req.query.locale || 'America/New_York';
     let timeSpan = req.query.timespan || '4m' ;
     let tSpan = {
         unit: timeSpan.charAt(timeSpan.length-1),
         number: Number(timeSpan.slice(0,timeSpan.length-1))
     };
 
-    let limit = Number(req.query.limit);
+    let limit = Number(req.query.limit) || 50 ;
 
     // let latestdatefilter = setLatestDateFilter(earliestdatefilter,tSpan);
 
@@ -98,7 +98,7 @@ app.get('/cal', function (req,res) {
 
       .then(function(GoogleResponse){
         let rawJSONdata = ical2json.convert(GoogleResponse.body);
-        let processedJSONdata = CALMAKER.processData(rawJSONdata,earliestdatefilter,tSpan,limit);
+        let processedJSONdata = CALMAKER.processData(rawJSONdata,earliestdatefilter,tSpan,limit,locale);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,
