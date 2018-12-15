@@ -24,7 +24,7 @@ class CALMAKER {
         return result;
     }
 
-    // SPLIT UP DTSTART TZID and RRULE
+    // splitting up  DTSTART TZID and RRULE
     create_DTSTART_TZID_and_RRULEstr (item) {
         let pattern = /DTSTART/;
         let TZID, DTSTART, RRULEstr;
@@ -35,7 +35,6 @@ class CALMAKER {
                 RRULEstr = `${key}:${item[key]};\nRRULE:${item['RRULE']}`;
             }
         }
-
         return {
             "TZID": TZID,
             "DTSTART": DTSTART,
@@ -99,11 +98,11 @@ class CALMAKER {
 
     } // end createDateDisplayString
 
-    // // not implemented
-    // setLatestDateFilter (earliestdatefilter,tSpan) {
-    //     // tSpan is obj with properties 'unit' and 'number'
-    //     return earliestdatefilter;
-    // }
+    // * not implemented
+    setLatestDateFilter (earlydatefilter,tSpan) {
+        // tSpan is obj with properties 'unit' and 'number'
+        return earlydatefilter;
+    }
 
     extractRRULEobj (rrule, eventdate) {
         let rruleObj = rrulestr(`${eventdate}\n${rrule}`);
@@ -120,18 +119,18 @@ class CALMAKER {
         return rrextracted;
     }
 
-    filterByEarliest (items, earliestdatefilter) {
+    filterByEarly (items, earlydatefilter) {
         let currItems = items.filter( (item) => {
-            if(!item.RRULE &&  item.DTSTARTjs <= earliestdatefilter) {
+            if(!item.RRULE &&  item.DTSTARTjs <= earlydatefilter) {
                 return false;
             } else {
                 return true;
             }
         });
         return currItems;
-    }  // end filterByEarliest
+    }  // end filterByEarly
 
-    processData (rawJSONdata,earliestdatefilter,tSpan,limit,locale) {
+    processData (rawJSONdata,earlydatefilter,tSpan,limit,locale) {
         let Vitems = rawJSONdata.VCALENDAR[0].VEVENT;
         let defaultTZID = rawJSONdata.VCALENDAR[0]['X-WR-TIMEZONE'];
         // tzid for each item same as general calendar tzid unless specified
@@ -170,14 +169,19 @@ class CALMAKER {
             let DTjsFilledItem = Object.assign(item, item2);
             return DTjsFilledItem;
         });
-        //filter by earliestdatefilter
-        let itemsFilteredByEarliest = this.filterByEarliest(itemsWithDTjs,earliestdatefilter);
+        //filter by earlydatefilter
+        let itemsFilteredByEarly = this.filterByEarly(itemsWithDTjs,earlydatefilter);
 
-        //extrapolate from rrrules
-        //set up buckets by # limit
-        //return first bucket
-        //  = this.filterByEarliest(items);
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsFilteredByEarliest;
+        // // extrapolate from rrules.
+        // for items with rrules, create rruleObj.
+        // filter out those with count or until which do not reach today.
+        // with the rest, whether they are infinite or do reach today, include them,
+        //  applying the timespan/latedate filter.
+        // we need some helpers:
+        // * get last occurance of those which reoccur.  how does it compare to latedate filter?
+        // * get slice of those which are infinite.  compare to early and latedate filter.
+
+        rawJSONdata.VCALENDAR[0].VEVENT = itemsFilteredByEarly;
         return rawJSONdata;
     }
 
