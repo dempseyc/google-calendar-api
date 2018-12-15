@@ -120,9 +120,8 @@ class CALMAKER {
         return rrextracted;
     }
 
-    filterByEarliest (veventData, earliestdatefilter, latestdatefilter, returnCount) {
-        // console.log(items, "in fd");
-        let currItems = veventData.filter( (item) => {
+    filterByEarliest (items, earliestdatefilter) {
+        let currItems = items.filter( (item) => {
             if(!item.RRULE &&  item.DTSTARTjs <= earliestdatefilter) {
                 return false;
             } else {
@@ -135,9 +134,9 @@ class CALMAKER {
     processData (rawJSONdata,earliestdatefilter,tSpan,limit,locale) {
         let Vitems = rawJSONdata.VCALENDAR[0].VEVENT;
         let defaultTZID = rawJSONdata.VCALENDAR[0]['X-WR-TIMEZONE'];
+        // tzid for each item same as general calendar tzid unless specified
         let itemsWithTZIDs = Vitems.map( (item) => {
             let item2 = {};
-            // tzid for each item same as general calendar tzid unless specified
             if (item.DTSTART && !item.TZID) {
                 item2.TZID = defaultTZID; //  e.g. 'America/New_York'
             }
@@ -150,18 +149,33 @@ class CALMAKER {
             else if (!item.DTEND) {
                 item2 = Object.assign(item2, this.create_DTEND_and_TZIDend(item));
             }
-            let filledItem = Object.assign(item, item2);
-            return filledItem;
+            let DTandTZfilledItem = Object.assign(item, item2);
+            return DTandTZfilledItem;
         });
-        // let itemsWithDATETIME = itemsWithTZIDs.map( (item) => {
-
-        // });
-            //filter by earliest
+        // all items have dtstart and dtend js dates
+        let itemsWithDTjs = itemsWithTZIDs.map( (item) => {
+            let item2 = {};
+            if (item.DTSTART.substr(-1) === 'Z') {
+                item2.DTSTARTjs = this.utcDateStrToJSDate(item.DTSTART);
+            }
+            else {
+                item2.DTSTARTjs = this.dateStrToJSDate(item.DTSTART);
+            }
+            if (item.DTEND.substr(-1) === 'Z') {
+                item2.DTENDjs = this.utcDateStrToJSDate(item.DTEND);
+            }
+            else {
+                item2.DTENDjs = this.dateStrToJSDate(item.DTEND);
+            }
+            let DTjsFilledItem = Object.assign(item, item2);
+            return DTjsFilledItem;
+        });
+        //filter by earliest
         //extrapolate from rrrules
         //set up buckets by # limit
         //return first bucket
         //  = this.filterByEarliest(items);
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsWithTZIDs;
+        rawJSONdata.VCALENDAR[0].VEVENT = itemsWithDTjs;
         return rawJSONdata;
     }
 
