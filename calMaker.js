@@ -170,12 +170,14 @@ class CALMAKER {
             let DTjsFilledItem = Object.assign(item, item2);
             return DTjsFilledItem;
         });
-        //filter by earliest
+        //filter by earliestdatefilter
+        let itemsFilteredByEarliest = this.filterByEarliest(itemsWithDTjs,earliestdatefilter);
+
         //extrapolate from rrrules
         //set up buckets by # limit
         //return first bucket
         //  = this.filterByEarliest(items);
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsWithDTjs;
+        rawJSONdata.VCALENDAR[0].VEVENT = itemsFilteredByEarliest;
         return rawJSONdata;
     }
 
