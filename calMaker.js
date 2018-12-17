@@ -183,14 +183,14 @@ class CALMAKER {
             let occAdded = items.map( (item) => {
                 let item2 = {};
                 let occs = item.rruleObj.between(edFilterLDT.toJSDate(),ldFilterLDT.toJSDate());
-                let occurances = occs.map( (date) =>
-                    DateTime
-                        .fromJSDate(date)
+                let ocurrences = occs.map( (date) => 
+                        DateTime
+                        .fromJSDate(date, {zone: item.TZID})
+                        .setZone('local', { keepLocalTime: true })
                         .toUTC()
-                        .setZone(item.TZID, { keepLocalTime: true })
-                        .toJSDate()
                 );
-                item2.OCCURANCES = occurances;
+                
+                item2.OCCURANCES = ocurrences;
                 return Object.assign(item,item2);
             });
             return occAdded;
@@ -205,10 +205,12 @@ class CALMAKER {
                         DateTime
                         .fromJSDate(date)
                         .toUTC()
-                        .setZone(item.TZID, { keepLocalTime: true })
+                        .setZone('local', { keepLocalTime: true })
+                        // .toJSDate()
                     );
                     if (all.length > 0) {
                         let final = DateTime.fromISO(all[all.length-1], {zone: item.TZID});
+                        console.log("final", final.toISO(), item.SUMMARY);
                         if (final < edFilterLDT) {
                             // reocurrance ends before earlydate
                             return false;
