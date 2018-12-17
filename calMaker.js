@@ -203,10 +203,9 @@ class CALMAKER {
                     let occ = item.rruleObj.all();
                     let all = occ.map( (date) => 
                         DateTime
-                        .fromJSDate(date)
-                        .toUTC()
+                        .fromJSDate(date, {zone: item.TZID})
                         .setZone('local', { keepLocalTime: true })
-                        // .toJSDate()
+                        .toUTC()
                     );
                     if (all.length > 0) {
                         let final = DateTime.fromISO(all[all.length-1], {zone: item.TZID});
