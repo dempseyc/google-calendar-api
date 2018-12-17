@@ -1,5 +1,5 @@
 const rrulestr = require('rrule').rrulestr;
-const { DateTime } = require('luxon');
+const { DateTime,Info,Duration,Interval } = require('luxon');
 
 class CALMAKER {
 
@@ -7,7 +7,7 @@ class CALMAKER {
         this.myNum = 9;
         this.vevent = undefined;
         this.bucketDefinitions = undefined; 
-        this.now = new Date();
+        this.now = DateTime.local();
     }
 
     methForTesting (num1,num2) {
@@ -32,7 +32,9 @@ class CALMAKER {
             if ( pattern.test(key) ) {
                 TZID = key.split('=')[1];
                 DTSTART = item[key];
-                RRULEstr = `${key}:${item[key]};\nRRULE:${item['RRULE']}`;
+                if ( item['RRULE'] ) {
+                    RRULEstr = `${key}:${item[key]};\nRRULE:${item['RRULE']}`;
+                }
             }
         }
         return {
@@ -57,34 +59,21 @@ class CALMAKER {
         }
     }
 
-    dateStrToJSDate (str) {
-        let y = str.substr(0,4);
-        let m = str.substr(4,2) - 1;
-        let d = str.substr(6,2);
-        let hr = str.substr(9,2);
-        let min = str.substr(11,2);
-        return new Date(y,m,d,hr,min);
-    }
-
-    utcDateStrToJSDate (str) {
-        let y = str.substr(0,4);
-        let m = str.substr(4,2) - 1;
-        let d = str.substr(6,2);
-        let hr = str.substr(9,2);
-        let min = str.substr(11,2);
-        return new Date(Date.UTC(y,m,d,hr,min));
+    dateStrToLDT (str,tzid) {
+        let LDT = DateTime.fromISO(str, {zone: tzid}).toUTC().setZone('local', { keepLocalTime: true });
+        return LDT;
     }
 
     createLocationString (rawLocation) {
         return rawLocation.split('\\').join(' ');
     }
 
-    createDateDisplayString (DTSTARTjs) {
+    createDateDisplayString (DTSTARTldt) {
         let months = ['1','2','3','4','5','6','7','8','9','10','11','12'];
         let hours = ['1','2','3','4','5','6','7','8','9','10','11','12','1','2','3','4','5','6','7','8','9','10','11','12'];
         let days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-        let D = DTSTARTjs
+        let D = DTSTARTldt
         let dayStr = days[D.getDay()];
         let mStr = months[D.getMonth()];
         let dateStr = D.getDate();
@@ -98,10 +87,21 @@ class CALMAKER {
 
     } // end createDateDisplayString
 
-    // * not implemented
-    setLatestDateFilter (earlydatefilter,tSpan) {
-        // tSpan is obj with properties 'unit' and 'number'
-        return earlydatefilter;
+    setLatestDateFilter (edFilterLDT,tSpan) {
+        let unit;
+        switch (tSpan.unit) {
+            case 'm': unit = 'months';
+            break;
+            case 'd': unit = 'days';
+            break;
+            case 'y': unit = 'years';
+            break;
+        }
+        let obj = {};
+        obj[unit] = tSpan.number;
+        let ldFilterDT = edFilterLDT.plus(obj).toUTC().setZone('local', { keepLocalTime: true });
+        // console.log('ldFilterDT',ldFilterDT);
+        return ldFilterDT;
     }
 
     extractRRULEobj (RRULEstr) {
@@ -119,9 +119,9 @@ class CALMAKER {
         return rrextracted;
     }
 
-    filterByEarly (items, earlydatefilter) {
+    filterByEarly (items, edFilterLDT) {
         let currItems = items.filter( (item) => {
-            if(!item.RRULE &&  item.DTSTARTjs <= earlydatefilter) {
+            if(!item.RRULE &&  item.DTSTARTldt <= edFilterLDT) {
                 return false;
             } else {
                 return true;
@@ -131,10 +131,12 @@ class CALMAKER {
     }  // end filterByEarly
 
     processData (rawJSONdata,earlydatefilter,tSpan,limit,locale) {
+        let edFilterLDT = DateTime.fromJSDate(earlydatefilter).toUTC().setZone('local', { keepLocalTime: true });
+        let ldFilterLDT = this.setLatestDateFilter(edFilterLDT,tSpan);
         let Vitems = rawJSONdata.VCALENDAR[0].VEVENT;
         let defaultTZID = rawJSONdata.VCALENDAR[0]['X-WR-TIMEZONE'];
         // tzid for each item same as general calendar tzid unless specified
-        let itemsWithTZIDs = Vitems.map( (item) => {
+        let itemsTZIDsAdded = Vitems.map( (item) => {
             let item2 = {};
             if (item.DTSTART && !item.TZID) {
                 item2.TZID = defaultTZID; //  e.g. 'America/New_York'
@@ -152,52 +154,93 @@ class CALMAKER {
             return DTandTZfilledItem;
         });
         // all items have dtstart and dtend js dates
-        let itemsWithDTjs = itemsWithTZIDs.map( (item) => {
+        let itemsLDTsAdded = itemsTZIDsAdded.map( (item) => {
             let item2 = {};
-            if (item.DTSTART.substr(-1) === 'Z') {
-                item2.DTSTARTjs = this.utcDateStrToJSDate(item.DTSTART);
-            }
-            else {
-                item2.DTSTARTjs = this.dateStrToJSDate(item.DTSTART);
-            }
-            if (item.DTEND.substr(-1) === 'Z') {
-                item2.DTENDjs = this.utcDateStrToJSDate(item.DTEND);
-            }
-            else {
-                item2.DTENDjs = this.dateStrToJSDate(item.DTEND);
-            }
-            let DTjsFilledItem = Object.assign(item, item2);
-            return DTjsFilledItem;
+            item2.DTSTARTldt = this.dateStrToLDT(item.DTSTART,item.TZID);
+            item2.DTENDldt = this.dateStrToLDT(item.DTEND,item.TZID);
+            let LDTsAddedItem = Object.assign(item, item2);
+            return LDTsAddedItem;
         });
-        //filter by earlydatefilter
-        let itemsFilteredByEarly = this.filterByEarly(itemsWithDTjs,earlydatefilter);
+        //filter by edFilterLDT
+        let itemsFilteredByEarly = this.filterByEarly(itemsLDTsAdded,edFilterLDT);
 
         // // extrapolate from rrules.
+
         // for items with rrules, create rruleObj.
-        let itemsWithRRuleObjs = itemsFilteredByEarly.map( (item) => {
-            let item2 = {};
+        let itemsRRuleObjsAdded = itemsFilteredByEarly.map( (item) => {
+            let item2 = Object.assign({},item);
             if (item.RRULEstr) {
                 item2.rruleObj = this.extractRRULEobj(item.RRULEstr);
-            }
-            else if (item.RRULE) {
-                console.log('RRULE not handled');
             }
             let rruleObjCreatedItem = Object.assign(item, item2);
             return rruleObjCreatedItem;
         });
 
-        // might need a combinator for one-offs and rrule items HERE
 
-        // filter out those with count or until which do not reach today.
-        // let itemsRRuleNotEndingBeforeToday = itemsWithRRuleObjs
-            
-        // with the rest, whether they are infinite or do reach today, include them,
-        //  applying the timespan/latedate filter.
-        // we need some helpers:
-        // * get last occurance of those which reoccur.  how does it compare to latedate filter?
-        // * get slice of those which are infinite.  compare to early and latedate filter.
+        let itemsRRuleForExtrapolation = [];
 
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsWithRRuleObjs;
+        let itemsAddOccurrances = function (items) {
+            let occAdded = items.map( (item) => {
+                let item2 = {};
+                let occs = item.rruleObj.between(edFilterLDT.toJSDate(),ldFilterLDT.toJSDate());
+                let occurances = occs.map( (date) =>
+                    DateTime
+                        .fromJSDate(date)
+                        .toUTC()
+                        .setZone(item.TZID, { keepLocalTime: true })
+                        .toJSDate()
+                );
+                item2.OCCURANCES = occurances;
+                return Object.assign(item,item2);
+            });
+            return occAdded;
+        };
+
+        // filter out those not needed, but push to new array those needing extrapolation.
+        let itemsNoRRule = itemsRRuleObjsAdded.filter((item)=>{
+            if (item.rruleObj) {
+                if ( item.rruleObj.options.count != null || item.rruleObj.options.until != null) {
+                    let occ = item.rruleObj.all();
+                    let all = occ.map( (date) => 
+                        DateTime
+                        .fromJSDate(date)
+                        .toUTC()
+                        .setZone(item.TZID, { keepLocalTime: true })
+                    );
+                    if (all.length > 0) {
+                        let final = DateTime.fromISO(all[all.length-1], {zone: item.TZID});
+                        if (final < edFilterLDT) {
+                            // reocurrance ends before earlydate
+                            return false;
+                        }
+                        else {
+                            // reocurrance falls within datespan
+                            itemsRRuleForExtrapolation.push(item);
+                            return false;
+                        }
+                    // bug fix stuff2 from 2017 with no instances
+                    } else if (all.length === 0) {
+                        if (item.DTSTARTldt < edFilterLDT) {
+                            return false;
+                        }
+                    }
+                } else {
+                    // has infinite recurrance
+                    itemsRRuleForExtrapolation.push(item);
+                    return false;
+                }
+            }
+            else {
+                console.log(item.SUMMARY, 'has no rrule');
+                return true;
+            }
+            // return false;
+        });
+        console.log('exit filter');
+        
+        let itemsOccurancesAdded = itemsAddOccurrances(itemsRRuleForExtrapolation);
+
+        rawJSONdata.VCALENDAR[0].VEVENT = itemsOccurancesAdded;
         return rawJSONdata;
     }
 
