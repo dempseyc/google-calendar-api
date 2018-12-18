@@ -24,7 +24,7 @@ class CALMAKER {
         return result;
     }
 
-    // splitting up  DTSTART TZID and RRULE
+    // splitting up DTSTART TZID and RRULE
     create_DTSTART_TZID_and_RRULEstr (item) {
         let pattern = /DTSTART/;
         let TZID, DTSTART, RRULEstr;
@@ -43,23 +43,25 @@ class CALMAKER {
             "RRULEstr": RRULEstr
         }
     }
-
-    create_DTEND_and_TZIDend (item) {
-        let pattern = /DTEND/;
-        let DTEND, TZIDend;
-        for (let key in item) {
-            if ( pattern.test(key) ) {
-                TZIDend = key.split('=')[1];
-                DTEND = item[key];
-            }
-        }
-        return {
-            "TZIDend": TZIDend,
-            "DTEND": DTEND
-        }
-    }
+    // // not used now, but maybe good for next larger context, see above
+    // // , maybe add duration as an output at some level of development.
+    // create_DTEND_and_TZIDend (item) {
+    //     let pattern = /DTEND/;
+    //     let DTEND, TZIDend;
+    //     for (let key in item) {
+    //         if ( pattern.test(key) ) {
+    //             TZIDend = key.split('=')[1];
+    //             DTEND = item[key];
+    //         }
+    //     }
+    //     return {
+    //         "TZIDend": TZIDend,
+    //         "DTEND": DTEND
+    //     }
+    // }
 
     dateStrToLDT (str,tzid) {
+        // honestly, still some mystery to me about how this transforms, but it works, i think
         let LDT = DateTime.fromISO(str, {zone: tzid}).toUTC().setZone('local', { keepLocalTime: true });
         return LDT;
     }
@@ -68,6 +70,8 @@ class CALMAKER {
         return rawLocation.split('\\').join(' ');
     }
 
+    // could include locale and more LDT features in here?
+    // see how it shakes out
     createDateDisplayString (DTSTARTldt) {
         let months = ['1','2','3','4','5','6','7','8','9','10','11','12'];
         let hours = ['1','2','3','4','5','6','7','8','9','10','11','12','1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -84,10 +88,10 @@ class CALMAKER {
         let result = `${dayStr} ${mStr}/${dateStr} ${hrStr}:${minStr}${ampm}`;
 
         return result;
-
-    } // end createDateDisplayString
+    }
 
     setLatestDateFilter (edFilterLDT,tSpan) {
+        // tSpan default is {unit: 'm', number: 4}
         let unit;
         switch (tSpan.unit) {
             case 'm': unit = 'months';
@@ -99,8 +103,8 @@ class CALMAKER {
         }
         let obj = {};
         obj[unit] = tSpan.number;
+        // again, honest, not %100 sure how this transformation works with LDT
         let ldFilterDT = edFilterLDT.plus(obj).toUTC().setZone('local', { keepLocalTime: true });
-        // console.log('ldFilterDT',ldFilterDT);
         return ldFilterDT;
     }
 
@@ -109,32 +113,26 @@ class CALMAKER {
         return rruleObj;
     }
 
-    currItemsRRextracted (items, eventdate) {
-        let rrextracted = items.map( (item) => {
-            if (item.RRULE) {
-                item.RRULE = this.extractRRULE(item.RRULE, eventdate);
-            }
-            return item;
-        })
-        return rrextracted;
-    }
-
+    // initial filter for items occurring once and before earlydatefilter
     filterByEarly (items, edFilterLDT) {
         let currItems = items.filter( (item) => {
-            if(!item.RRULE &&  item.DTSTARTldt <= edFilterLDT) {
+            if( !item.RRULE && ( item.DTSTARTldt <= edFilterLDT ) ) {
                 return false;
             } else {
                 return true;
             }
         });
         return currItems;
-    }  // end filterByEarly
+    }
 
-    processData (rawJSONdata,earlydatefilter,tSpan,limit,locale) {
+    // maybe include locale with Luxon stuff
+    processData (rawJSONdata, earlydatefilter, tSpan, locale) {
         let edFilterLDT = DateTime.fromJSDate(earlydatefilter).toUTC().setZone('local', { keepLocalTime: true });
         let ldFilterLDT = this.setLatestDateFilter(edFilterLDT,tSpan);
         let Vitems = rawJSONdata.VCALENDAR[0].VEVENT;
         let defaultTZID = rawJSONdata.VCALENDAR[0]['X-WR-TIMEZONE'];
+
+        // a method to break out
         // tzid for each item same as general calendar tzid unless specified
         let itemsTZIDsAdded = Vitems.map( (item) => {
             let item2 = {};
@@ -144,15 +142,18 @@ class CALMAKER {
             else if (!item.DTSTART) {
                 item2 = Object.assign(item2, this.create_DTSTART_TZID_and_RRULEstr(item));
             }
-            if (item.DTEND) {
-                item2.TZIDend = defaultTZID;
-            }
-            else if (!item.DTEND) {
-                item2 = Object.assign(item2, this.create_DTEND_and_TZIDend(item));
-            }
+            // // see this.create_DTEND_and_TZIDend()
+            // if (item.DTEND) {
+            //     item2.TZIDend = defaultTZID;
+            // }
+            // else if (!item.DTEND) {
+            //     item2 = Object.assign(item2, this.create_DTEND_and_TZIDend(item));
+            // }
             let DTandTZfilledItem = Object.assign(item, item2);
             return DTandTZfilledItem;
         });
+
+        // a method to break out
         // all items have dtstart and dtend js dates
         let itemsLDTsAdded = itemsTZIDsAdded.map( (item) => {
             let item2 = {};
@@ -161,14 +162,16 @@ class CALMAKER {
             let LDTsAddedItem = Object.assign(item, item2);
             return LDTsAddedItem;
         });
-        //filter by edFilterLDT
+
+        // filter by edFilterLDT
         let itemsFilteredByEarly = this.filterByEarly(itemsLDTsAdded,edFilterLDT);
 
         // // extrapolate from rrules.
 
+        // a method to break out
         // for items with rrules, create rruleObj.
         let itemsRRuleObjsAdded = itemsFilteredByEarly.map( (item) => {
-            let item2 = Object.assign({},item);
+            let item2 = {};
             if (item.RRULEstr) {
                 item2.rruleObj = this.extractRRULEobj(item.RRULEstr);
             }
@@ -176,10 +179,11 @@ class CALMAKER {
             return rruleObjCreatedItem;
         });
 
-
+        // where we will store the problem children
         let itemsRRuleForExtrapolation = [];
 
-        let itemsAddOccurrances = function (items) {
+
+        let itemsAddOccurrences = function (items) {
             let occAdded = items.map( (item) => {
                 let item2 = {};
                 let occs = item.rruleObj.between(edFilterLDT.toJSDate(),ldFilterLDT.toJSDate());
@@ -190,58 +194,59 @@ class CALMAKER {
                         .toUTC()
                 );
                 
-                item2.OCCURANCES = ocurrences;
+                item2.OCCURENCES = ocurrences;
                 return Object.assign(item,item2);
             });
             return occAdded;
         };
 
-        // filter out those not needed, but push to new array those needing extrapolation.
+        // filter out those not needed, but push to itemsRRuleForExtrapolation
         let itemsNoRRule = itemsRRuleObjsAdded.filter((item)=>{
             if (item.rruleObj) {
                 if ( item.rruleObj.options.count != null || item.rruleObj.options.until != null) {
-                    let occ = item.rruleObj.all();
-                    let all = occ.map( (date) => 
+                    let occs = item.rruleObj.all();
+                    let all = occs.map( (date) => 
                         DateTime
                         .fromJSDate(date, {zone: item.TZID})
-                        .setZone('local', { keepLocalTime: true })
                         .toUTC()
+                        // .setZone('local', { keepLocalTime: true })
                     );
                     if (all.length > 0) {
-                        let final = DateTime.fromISO(all[all.length-1], {zone: item.TZID});
-                        console.log("final", final.toISO(), item.SUMMARY);
+                        let final = all[all.length-1].toJSDate();
+                        console.log("final", final, item.SUMMARY);
                         if (final < edFilterLDT) {
-                            // reocurrance ends before earlydate
+                            // reocurrence ends before earlydate
                             return false;
                         }
                         else {
-                            // reocurrance falls within datespan
+                            // reocurrence falls within datespan
                             itemsRRuleForExtrapolation.push(item);
                             return false;
                         }
-                    // bug fix stuff2 from 2017 with no instances
+                    // bug fix stuff2 from 2017 with no instances at all, another mystery
                     } else if (all.length === 0) {
-                        if (item.DTSTARTldt < edFilterLDT) {
+                        if (item.DTSTARTldt < edFilterLDT) { // could get rid of if statement?
                             return false;
                         }
                     }
                 } else {
-                    // has infinite recurrance
+                    // has infinite reocurrence
                     itemsRRuleForExtrapolation.push(item);
                     return false;
                 }
             }
             else {
-                console.log(item.SUMMARY, 'has no rrule');
+                // has no rrule
                 return true;
             }
-            // return false;
+            console.log('itemsNoRRule did not catch something');
+            return false;
         });
         console.log('exit filter');
         
-        let itemsOccurancesAdded = itemsAddOccurrances(itemsRRuleForExtrapolation);
+        let itemsOccurencesAdded = itemsAddOccurrences(itemsRRuleForExtrapolation);
 
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsOccurancesAdded;
+        rawJSONdata.VCALENDAR[0].VEVENT = itemsOccurencesAdded;
         return rawJSONdata;
     }
 

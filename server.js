@@ -98,7 +98,7 @@ app.get('/cal', function (req,res) {
 
       .then(function(GoogleResponse){
         let rawJSONdata = ical2json.convert(GoogleResponse.body);
-        let processedJSONdata = CALMAKER.processData(rawJSONdata,earliestdatefilter,tSpan,limit,locale);
+        let processedJSONdata = CALMAKER.processData(rawJSONdata,earliestdatefilter,tSpan,locale);
         let fGoogleResponse = {
             "id": calID,
             "now": todayStr,
