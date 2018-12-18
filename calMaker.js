@@ -43,22 +43,6 @@ class CALMAKER {
             "RRULEstr": RRULEstr
         }
     }
-    // // not used now, but maybe good for next larger context, see above
-    // // , maybe add duration as an output at some level of development.
-    // create_DTEND_and_TZIDend (item) {
-    //     let pattern = /DTEND/;
-    //     let DTEND, TZIDend;
-    //     for (let key in item) {
-    //         if ( pattern.test(key) ) {
-    //             TZIDend = key.split('=')[1];
-    //             DTEND = item[key];
-    //         }
-    //     }
-    //     return {
-    //         "TZIDend": TZIDend,
-    //         "DTEND": DTEND
-    //     }
-    // }
 
     dateStrToLDT (str,tzid) {
         // honestly, still some mystery to me about how this transforms, but it works, i think
@@ -70,8 +54,6 @@ class CALMAKER {
         return rawLocation.split('\\').join(' ');
     }
 
-    // could include locale and more LDT features in here?
-    // see how it shakes out
     createDateDisplayString (DTSTARTldt) {
         let months = ['1','2','3','4','5','6','7','8','9','10','11','12'];
         let hours = ['1','2','3','4','5','6','7','8','9','10','11','12','1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -125,8 +107,12 @@ class CALMAKER {
         return currItems;
     }
 
-    // maybe include locale with Luxon stuff
-    processData (rawJSONdata, earlydatefilter, tSpan, locale) {
+
+    // // //
+    // // // 
+    // // //
+
+    processData (rawJSONdata, earlydatefilter, tSpan) {
         let edFilterLDT = DateTime.fromJSDate(earlydatefilter).toUTC().setZone('local', { keepLocalTime: true });
         let ldFilterLDT = this.setLatestDateFilter(edFilterLDT,tSpan);
         let Vitems = rawJSONdata.VCALENDAR[0].VEVENT;
@@ -142,13 +128,6 @@ class CALMAKER {
             else if (!item.DTSTART) {
                 item2 = Object.assign(item2, this.create_DTSTART_TZID_and_RRULEstr(item));
             }
-            // // see this.create_DTEND_and_TZIDend()
-            // if (item.DTEND) {
-            //     item2.TZIDend = defaultTZID;
-            // }
-            // else if (!item.DTEND) {
-            //     item2 = Object.assign(item2, this.create_DTEND_and_TZIDend(item));
-            // }
             let DTandTZfilledItem = Object.assign(item, item2);
             return DTandTZfilledItem;
         });
@@ -166,7 +145,7 @@ class CALMAKER {
         // filter by edFilterLDT
         let itemsFilteredByEarly = this.filterByEarly(itemsLDTsAdded,edFilterLDT);
 
-        // // extrapolate from rrules.
+        // //  // extrapolate from rrules.
 
         // a method to break out
         // for items with rrules, create rruleObj.
@@ -182,7 +161,8 @@ class CALMAKER {
         // where we will store the problem children
         let itemsRRuleForExtrapolation = [];
 
-
+        // i've made all these functions nouns, but go back through and break them out
+        // make them verbs
         let itemsAddOccurrences = function (items) {
             let occAdded = items.map( (item) => {
                 let item2 = {};
@@ -200,7 +180,7 @@ class CALMAKER {
             return occAdded;
         };
 
-        // filter out those not needed, but push to itemsRRuleForExtrapolation
+        // filter out those not needed, but push others to itemsRRuleForExtrapolation
         let itemsNoRRule = itemsRRuleObjsAdded.filter((item)=>{
             if (item.rruleObj) {
                 if ( item.rruleObj.options.count != null || item.rruleObj.options.until != null) {
@@ -213,13 +193,13 @@ class CALMAKER {
                     );
                     if (all.length > 0) {
                         let final = all[all.length-1].toJSDate();
-                        console.log("final", final, item.SUMMARY);
+                        // console.log("final", final, item.SUMMARY);
                         if (final < edFilterLDT) {
-                            // reocurrence ends before earlydate
+                            // recurrence ends before earlydate
                             return false;
                         }
                         else {
-                            // reocurrence falls within datespan
+                            // recurrence falls within datespan
                             itemsRRuleForExtrapolation.push(item);
                             return false;
                         }
@@ -230,7 +210,7 @@ class CALMAKER {
                         }
                     }
                 } else {
-                    // has infinite reocurrence
+                    // has infinite recurrence
                     itemsRRuleForExtrapolation.push(item);
                     return false;
                 }
@@ -241,18 +221,381 @@ class CALMAKER {
             }
             console.log('itemsNoRRule did not catch something');
             return false;
-        });
-        console.log('exit filter');
+        });  // end itemsNoRRule filter
+
+        // ;ut them together
         
         let itemsOccurencesAdded = itemsAddOccurrences(itemsRRuleForExtrapolation);
 
-        rawJSONdata.VCALENDAR[0].VEVENT = itemsOccurencesAdded;
+        let allShowTimesForFE = itemsNoRRule.concat(itemsOccurencesAdded);
+
+        // map allShowTimesForFE to a new array of FE strings,
+        // map rawJSONdata.VCALENDAR and
+        ///////rawjSOndata.VEVENT to new data, return new JSONdata obj...
+
+        rawJSONdata.VCALENDAR[0].VEVENT = allShowTimesForFE;
+
         return rawJSONdata;
     }
 
 }
 
 module.exports = new CALMAKER();
+
+// // // // RAWJSONDATA
+// {
+//   "id": "hhc1mfvhcajj77n5jcte1gq50s",
+//   "now": "2018-12-18T06:09:22.157Z",
+//   "timespan": {
+//     "unit": "m",
+//     "number": 4
+//   },
+//   "earliestdatefilter": "2018-12-18T06:09:22.157Z",
+//   "status": 200,
+//   "message": "OK",
+//   "calData": {
+//     "VCALENDAR": [
+//       {
+//         "PRODID": "-//Google Inc//Google Calendar 70.9054//EN",
+//         "VERSION": "2.0",
+//         "CALSCALE": "GREGORIAN",
+//         "METHOD": "PUBLISH",
+//         "X-WR-CALNAME": "craig public test",
+//         "X-WR-TIMEZONE": "America/New_York",
+//         "X-WR-CALDESC": "",
+//         "VTIMEZONE": [
+//           {
+//             "TZID": "Atlantic/Bermuda",
+//             "X-LIC-LOCATION": "Atlantic/Bermuda",
+//             "DAYLIGHT": [
+//               {
+//                 "TZOFFSETFROM": "-0400",
+//                 "TZOFFSETTO": "-0300",
+//                 "TZNAME": "ADT",
+//                 "DTSTART": "19700308T020000",
+//                 "RRULE": "FREQ=YEARLY;BYMONTH=3;BYDAY=2SU"
+//               }
+//             ],
+//             "STANDARD": [
+//               {
+//                 "TZOFFSETFROM": "-0300",
+//                 "TZOFFSETTO": "-0400",
+//                 "TZNAME": "AST",
+//                 "DTSTART": "19701101T020000",
+//                 "RRULE": "FREQ=YEARLY;BYMONTH=11;BYDAY=1SU"
+//               }
+//             ]
+//           },
+//           {
+//             "TZID": "Europe/Paris",
+//             "X-LIC-LOCATION": "Europe/Paris",
+//             "DAYLIGHT": [
+//               {
+//                 "TZOFFSETFROM": "+0100",
+//                 "TZOFFSETTO": "+0200",
+//                 "TZNAME": "CEST",
+//                 "DTSTART": "19700329T020000",
+//                 "RRULE": "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+//               }
+//             ],
+//             "STANDARD": [
+//               {
+//                 "TZOFFSETFROM": "+0200",
+//                 "TZOFFSETTO": "+0100",
+//                 "TZNAME": "CET",
+//                 "DTSTART": "19701025T030000",
+//                 "RRULE": "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+//               }
+//             ]
+//           },
+//           {
+//             "TZID": "America/New_York",
+//             "X-LIC-LOCATION": "America/New_York",
+//             "DAYLIGHT": [
+//               {
+//                 "TZOFFSETFROM": "-0500",
+//                 "TZOFFSETTO": "-0400",
+//                 "TZNAME": "EDT",
+//                 "DTSTART": "19700308T020000",
+//                 "RRULE": "FREQ=YEARLY;BYMONTH=3;BYDAY=2SU"
+//               }
+//             ],
+//             "STANDARD": [
+//               {
+//                 "TZOFFSETFROM": "-0400",
+//                 "TZOFFSETTO": "-0500",
+//                 "TZNAME": "EST",
+//                 "DTSTART": "19701101T020000",
+//                 "RRULE": "FREQ=YEARLY;BYMONTH=11;BYDAY=1SU"
+//               }
+//             ]
+//           }
+//         ],
+//         "VEVENT": [
+//           {
+//             "DTSTART;TZID=Atlantic/Bermuda": "20181119T180000",
+//             "DTEND;TZID=Atlantic/Bermuda": "20181119T190000",
+//             "RRULE": "FREQ=DAILY;UNTIL=20181220T035959Z",
+//             "DTSTAMP": "20181218T060918Z",
+//             "UID": "07vkm1ju9s4i5bl9a9m1jbae4v@google.com",
+//             "CREATED": "20181125T035903Z",
+//             "DESCRIPTION": "",
+//             "LAST-MODIFIED": "20181125T041557Z",
+//             "LOCATION": "",
+//             "SEQUENCE": "2",
+//             "STATUS": "CONFIRMED",
+//             "SUMMARY": "stuff4",
+//             "TRANSP": "OPAQUE",
+//             "TZID": "Atlantic/Bermuda",
+//             "DTSTART": "20181119T180000",
+//             "RRULEstr": "DTSTART;TZID=Atlantic/Bermuda:20181119T180000;\nRRULE:FREQ=DAILY;UNTIL=20181220T035959Z",
+//             "DTSTARTldt": "2018-11-19T22:00:00.000-05:00",
+//             "DTENDldt": null,
+//             "rruleObj": {
+//               "_string": null,
+//               "_cache": null,
+//               "origOptions": {
+//                 "freq": 3,
+//                 "until": "2018-12-20T03:59:59.000Z",
+//                 "dtstart": "2018-11-19T18:00:00.000Z",
+//                 "tzid": "Atlantic/Bermuda"
+//               },
+//               "options": {
+//                 "freq": 3,
+//                 "until": "2018-12-20T03:59:59.000Z",
+//                 "dtstart": "2018-11-19T18:00:00.000Z",
+//                 "tzid": "Atlantic/Bermuda",
+//                 "interval": 1,
+//                 "wkst": 0,
+//                 "count": null,
+//                 "bysetpos": null,
+//                 "bymonth": null,
+//                 "bymonthday": [
+                  
+//                 ],
+//                 "bynmonthday": [
+                  
+//                 ],
+//                 "byyearday": null,
+//                 "byweekno": null,
+//                 "byweekday": null,
+//                 "bynweekday": null,
+//                 "byhour": [
+//                   18
+//                 ],
+//                 "byminute": [
+//                   0
+//                 ],
+//                 "bysecond": [
+//                   0
+//                 ],
+//                 "byeaster": null
+//               },
+//               "timeset": [
+//                 {
+//                   "hour": 18,
+//                   "minute": 0,
+//                   "second": 0,
+//                   "millisecond": 0
+//                 }
+//               ],
+//               "_len": 31
+//             },
+//             "OCCURENCES": [
+//               "2018-12-18T18:00:00.000Z",
+//               "2018-12-19T18:00:00.000Z"
+//             ]
+//           },
+//           {
+//             "DTSTART;TZID=Europe/Paris": "20181023T170000",
+//             "DTEND;TZID=Europe/Paris": "20181023T180000",
+//             "RRULE": "FREQ=WEEKLY;BYDAY=TU",
+//             "DTSTAMP": "20181218T060918Z",
+//             "UID": "01nkipt4026cdqu4uvijjhr1me@google.com",
+//             "CREATED": "20181021T195753Z",
+//             "DESCRIPTION": "",
+//             "LAST-MODIFIED": "20181021T195816Z",
+//             "LOCATION": "Paris\\, France",
+//             "SEQUENCE": "1",
+//             "STATUS": "CONFIRMED",
+//             "SUMMARY": "weeklyeventTUE",
+//             "TRANSP": "OPAQUE",
+//             "TZID": "Europe/Paris",
+//             "DTSTART": "20181023T170000",
+//             "RRULEstr": "DTSTART;TZID=Europe/Paris:20181023T170000;\nRRULE:FREQ=WEEKLY;BYDAY=TU",
+//             "DTSTARTldt": "2018-10-23T15:00:00.000-04:00",
+//             "DTENDldt": null,
+//             "rruleObj": {
+//               "_string": null,
+//               "_cache": null,
+//               "origOptions": {
+//                 "freq": 2,
+//                 "byweekday": [
+//                   {
+//                     "weekday": 1
+//                   }
+//                 ],
+//                 "dtstart": "2018-10-23T17:00:00.000Z",
+//                 "tzid": "Europe/Paris"
+//               },
+//               "options": {
+//                 "freq": 2,
+//                 "byweekday": [
+//                   1
+//                 ],
+//                 "dtstart": "2018-10-23T17:00:00.000Z",
+//                 "tzid": "Europe/Paris",
+//                 "interval": 1,
+//                 "wkst": 0,
+//                 "count": null,
+//                 "until": null,
+//                 "bysetpos": null,
+//                 "bymonth": null,
+//                 "bymonthday": [
+                  
+//                 ],
+//                 "bynmonthday": [
+                  
+//                 ],
+//                 "byyearday": null,
+//                 "byweekno": null,
+//                 "bynweekday": null,
+//                 "byhour": [
+//                   17
+//                 ],
+//                 "byminute": [
+//                   0
+//                 ],
+//                 "bysecond": [
+//                   0
+//                 ],
+//                 "byeaster": null
+//               },
+//               "timeset": [
+//                 {
+//                   "hour": 17,
+//                   "minute": 0,
+//                   "second": 0,
+//                   "millisecond": 0
+//                 }
+//               ],
+//               "_len": 27
+//             },
+//             "OCCURENCES": [
+//               "2018-12-25T17:00:00.000Z",
+//               "2019-01-01T17:00:00.000Z",
+//               "2019-01-08T17:00:00.000Z",
+//               "2019-01-15T17:00:00.000Z",
+//               "2019-01-22T17:00:00.000Z",
+//               "2019-01-29T17:00:00.000Z",
+//               "2019-02-05T17:00:00.000Z",
+//               "2019-02-12T17:00:00.000Z",
+//               "2019-02-19T17:00:00.000Z",
+//               "2019-02-26T17:00:00.000Z",
+//               "2019-03-05T17:00:00.000Z",
+//               "2019-03-12T17:00:00.000Z",
+//               "2019-03-19T17:00:00.000Z",
+//               "2019-03-26T17:00:00.000Z",
+//               "2019-04-02T17:00:00.000Z",
+//               "2019-04-09T17:00:00.000Z",
+//               "2019-04-16T17:00:00.000Z"
+//             ]
+//           },
+//           {
+//             "DTSTART;TZID=America/New_York": "20160604T210000",
+//             "DTEND;TZID=America/New_York": "20160604T230000",
+//             "RRULE": "FREQ=WEEKLY",
+//             "DTSTAMP": "20181218T060918Z",
+//             "UID": "0oko40419m2uk56fo3j4l6ujvi@google.com",
+//             "CREATED": "20180727T141727Z",
+//             "DESCRIPTION": "Like: www.bit.ly/dopeshow\\nHashtag: #DopeNY\\nTwitter: http://twitter.com/berrey\\nInstagram: http://instagram.com/berrey ",
+//             "LAST-MODIFIED": "20180727T141727Z",
+//             "LOCATION": "Park View Bar & Restaurant\\, 219 Dyckman St\\, New York\\, NY 10034 ",
+//             "SEQUENCE": "0",
+//             "STATUS": "CONFIRMED",
+//             "SUMMARY": "Dope (a free weekly comedy show)",
+//             "TRANSP": "OPAQUE",
+//             "TZID": "America/New_York",
+//             "DTSTART": "20160604T210000",
+//             "RRULEstr": "DTSTART;TZID=America/New_York:20160604T210000;\nRRULE:FREQ=WEEKLY",
+//             "DTSTARTldt": "2016-06-05T01:00:00.000-04:00",
+//             "DTENDldt": null,
+//             "rruleObj": {
+//               "_string": null,
+//               "_cache": null,
+//               "origOptions": {
+//                 "freq": 2,
+//                 "dtstart": "2016-06-04T21:00:00.000Z",
+//                 "tzid": "America/New_York"
+//               },
+//               "options": {
+//                 "freq": 2,
+//                 "dtstart": "2016-06-04T21:00:00.000Z",
+//                 "tzid": "America/New_York",
+//                 "interval": 1,
+//                 "wkst": 0,
+//                 "count": null,
+//                 "until": null,
+//                 "bysetpos": null,
+//                 "bymonth": null,
+//                 "bymonthday": [
+                  
+//                 ],
+//                 "bynmonthday": [
+                  
+//                 ],
+//                 "byyearday": null,
+//                 "byweekno": null,
+//                 "byweekday": [
+//                   5
+//                 ],
+//                 "bynweekday": null,
+//                 "byhour": [
+//                   21
+//                 ],
+//                 "byminute": [
+//                   0
+//                 ],
+//                 "bysecond": [
+//                   0
+//                 ],
+//                 "byeaster": null
+//               },
+//               "timeset": [
+//                 {
+//                   "hour": 21,
+//                   "minute": 0,
+//                   "second": 0,
+//                   "millisecond": 0
+//                 }
+//               ],
+//               "_len": 151
+//             },
+//             "OCCURENCES": [
+//               "2018-12-22T21:00:00.000Z",
+//               "2018-12-29T21:00:00.000Z",
+//               "2019-01-05T21:00:00.000Z",
+//               "2019-01-12T21:00:00.000Z",
+//               "2019-01-19T21:00:00.000Z",
+//               "2019-01-26T21:00:00.000Z",
+//               "2019-02-02T21:00:00.000Z",
+//               "2019-02-09T21:00:00.000Z",
+//               "2019-02-16T21:00:00.000Z",
+//               "2019-02-23T21:00:00.000Z",
+//               "2019-03-02T21:00:00.000Z",
+//               "2019-03-09T21:00:00.000Z",
+//               "2019-03-16T21:00:00.000Z",
+//               "2019-03-23T21:00:00.000Z",
+//               "2019-03-30T21:00:00.000Z",
+//               "2019-04-06T21:00:00.000Z",
+//               "2019-04-13T21:00:00.000Z"
+//             ]
+//           }
+//         ]
+//       }
+//     ]
+//   }
+// }
 
 
 // // how to luxon timedate with zone
