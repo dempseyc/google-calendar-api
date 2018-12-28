@@ -25,15 +25,23 @@ describe('meth2WithThisForTesting()', function() {
 });
 
 // test cases not in test suite:
-// 1. recurrence is infinite, starts before earlyfilterdate
-// 1.1. recurrence is infinite, starts after latefilterdate
-// 1.2. recurrence is infinite, starts within filter range
+// hard with dates, because timezones and getting dates to numbers,
+// using libraries that have no respect for the craft?
+// better off using python utils? I don't understand what these people are thinking,
+// but they must know better than me, right?
 
-// 2. recurrence is limited, ends before earlyfilterdate
-// 3. recurrence is limited, starts after latefilterdate
-// 4. recurrence is limited, some occurance falls between earlyfilterdate and latefilterdate
-// 5. no recurrance falls outside range
-// 6. no recurrance falls inside ranbe
+// 1. recurrence is infinite, starts before earlyfilterdate, true
+// 1.1. recurrence is infinite, starts after latefilterdate, false
+// 1.2. recurrence is infinite, starts within filter range, true
+
+// 2. recurrence is limited, final before earlyfilterdate, false
+// 3. recurrence is limited, starts after latefilterdate, false
+// 4. recurrence is limited, some occurance falls within range, true
+// 5. no recurrance falls before range, false
+// 6 no recurrence falls within range, true
+// 6.1 no recurrence falls after range, false
+
+// check 6, 
 
 // perhaps our calMaker methods sort these and our test suite tests them as arrays.
 
@@ -43,4 +51,4 @@ describe('meth2WithThisForTesting()', function() {
 // seems like making this testable is a bit tricky
 // meanwhile, believing in what I'm doing isn't tricky
 
-// its a noom fantasy, I'm living in.
+// is it a noob fantasy, I'm living in?

@@ -37,9 +37,19 @@ class CALMAKER {
                 }
             }
         }
+        let pattern2 = /DTEND/;
+        let TZIDend, DTEND;
+        for (let key in item) {
+            if ( pattern2.test(key) ) {
+                TZIDend = key.split('=')[1];
+                DTEND = item[key];
+            }
+        }
         return {
-            "TZID": TZID,
             "DTSTART": DTSTART,
+            "TZID": TZID,
+            "DTEND": DTEND,
+            "TZIDend": TZID,
             "RRULEstr": RRULEstr
         }
     }
@@ -72,7 +82,7 @@ class CALMAKER {
         return result;
     }
 
-    setLatestDateFilter (edFilterLDT,tSpan) {
+    setLateDateFilter (edFilterLDT,tSpan) {
         // tSpan default is {unit: 'm', number: 4}
         let unit;
         switch (tSpan.unit) {
@@ -107,6 +117,20 @@ class CALMAKER {
         return currItems;
     }
 
+    formatVevent (item) {
+        let item2 = {};
+        item2.dtstart = item.DTSTART;
+        item2.tzid = item.TZID;
+        item2.uid = item.UID;
+        item2.summary = item.SUMMARY;
+        item2.location = item.LOCATION;
+        item2.description = item.DESCRIPTION;
+        item2.occurrences = item.OCCURENCES;
+        item2.duration = item.DURATION;
+        // console.log(item2);
+        return item2;
+    }
+
 
     // // //
     // // // 
@@ -114,27 +138,40 @@ class CALMAKER {
 
     processData (rawJSONdata, earlydatefilter, tSpan) {
         let edFilterLDT = DateTime.fromJSDate(earlydatefilter).toUTC().setZone('local', { keepLocalTime: true });
-        let ldFilterLDT = this.setLatestDateFilter(edFilterLDT,tSpan);
+        let ldFilterLDT = this.setLateDateFilter(edFilterLDT,tSpan);
         let Vitems = rawJSONdata.VCALENDAR[0].VEVENT;
+        // bug fix for DTSTART;VALUE=DATE
+        let Vitems2 = Vitems.filter( (item) => !item["DTSTART;VALUE=DATE"] );
         let defaultTZID = rawJSONdata.VCALENDAR[0]['X-WR-TIMEZONE'];
 
         // a method to break out
         // tzid for each item same as general calendar tzid unless specified
-        let itemsTZIDsAdded = Vitems.map( (item) => {
+        let itemsTZIDsAdded = Vitems2.map( (item) => {
             let item2 = {};
             if (item.DTSTART && !item.TZID) {
                 item2.TZID = defaultTZID; //  e.g. 'America/New_York'
             }
             else if (!item.DTSTART) {
-                item2 = Object.assign(item2, this.create_DTSTART_TZID_and_RRULEstr(item));
+                item2 = this.create_DTSTART_TZID_and_RRULEstr(item);
+            }
+            else if (item.RRULE) {
+                item2 = Object.assign(item2, ) ;
             }
             let DTandTZfilledItem = Object.assign(item, item2);
             return DTandTZfilledItem;
         });
 
+        let itemsRRULEstrAdded = itemsTZIDsAdded.map( (item) => {
+            if (item.RRULE && !item.RRULEstr) {
+                return Object.assign(item, { "RRULEstr": `DTSTART:${item.DTSTART};\nRRULE:${item.RRULE}` } );
+            } else {
+                return item;
+            }
+        });
+
         // a method to break out
         // all items have dtstart and dtend js dates
-        let itemsLDTsAdded = itemsTZIDsAdded.map( (item) => {
+        let itemsLDTsAdded = itemsRRULEstrAdded.map( (item) => {
             let item2 = {};
             item2.DTSTARTldt = this.dateStrToLDT(item.DTSTART,item.TZID);
             item2.DTENDldt = this.dateStrToLDT(item.DTEND,item.TZID);
@@ -142,8 +179,16 @@ class CALMAKER {
             return LDTsAddedItem;
         });
 
+        let itemsDurationAdded = itemsLDTsAdded.map( (item) => {
+            let item2 = {};
+            let end = item.DTENDldt;
+            let start = item.DTSTARTldt;
+            item2.DURATION = end.diff(start).toObject();
+            return Object.assign(item, item2);
+        });
+
         // filter by edFilterLDT
-        let itemsFilteredByEarly = this.filterByEarly(itemsLDTsAdded,edFilterLDT);
+        let itemsFilteredByEarly = this.filterByEarly(itemsDurationAdded,edFilterLDT);
 
         // //  // extrapolate from rrules.
 
@@ -163,48 +208,59 @@ class CALMAKER {
 
         // i've made all these functions nouns, but go back through and break them out
         // make them verbs
+
         let itemsAddOccurrences = function (items) {
             let occAdded = items.map( (item) => {
                 let item2 = {};
                 let occs = item.rruleObj.between(edFilterLDT.toJSDate(),ldFilterLDT.toJSDate());
-                let ocurrences = occs.map( (date) => 
+                let occurrences = occs.map( (date) => 
                         DateTime
                         .fromJSDate(date, {zone: item.TZID})
                         .setZone('local', { keepLocalTime: true })
                         .toUTC()
                 );
                 
-                item2.OCCURENCES = ocurrences;
+                item2.OCCURENCES = occurrences;
                 return Object.assign(item,item2);
             });
             return occAdded;
         };
 
+        let noRRuleAddOccurence = function (item) {
+            // let date = new Date(Date.parse(item.DTSTART));
+            let item2 = {};
+            let occ = DateTime
+                .fromISO(item.DTSTART, {zone: item.TZID})
+                .setZone('local', {keepLocalTime: true})
+                .toUTC();
+            item2.OCCURENCES = [occ];
+            return Object.assign(item,item2);
+        }
+
         // filter out those not needed, but push others to itemsRRuleForExtrapolation
         let itemsNoRRule = itemsRRuleObjsAdded.filter((item)=>{
             if (item.rruleObj) {
-                if ( item.rruleObj.options.count != null || item.rruleObj.options.until != null) {
+                if ( item.rruleObj.options.until != null) {
                     let occs = item.rruleObj.all();
                     let all = occs.map( (date) => 
                         DateTime
                         .fromJSDate(date, {zone: item.TZID})
-                        .toUTC()
+                        // .toUTC()
                         // .setZone('local', { keepLocalTime: true })
                     );
                     if (all.length > 0) {
-                        let final = all[all.length-1].toJSDate();
-                        // console.log("final", final, item.SUMMARY);
+                        let final = DateTime.fromJSDate(item.rruleObj.options.until);
                         if (final < edFilterLDT) {
                             // recurrence ends before earlydate
                             return false;
-                        }
-                        else {
+                        } else {
                             // recurrence falls within datespan
+                            
                             itemsRRuleForExtrapolation.push(item);
                             return false;
                         }
                     // bug fix stuff2 from 2017 with no instances at all, another mystery
-                    } else if (all.length === 0) {
+                    } else {
                         if (item.DTSTARTldt < edFilterLDT) { // could get rid of if statement?
                             return false;
                         }
@@ -214,28 +270,37 @@ class CALMAKER {
                     itemsRRuleForExtrapolation.push(item);
                     return false;
                 }
-            }
-            else {
+            } else {
+                // console.log(item.SUMMARY);
                 // has no rrule
                 return true;
             }
             console.log('itemsNoRRule did not catch something');
             return false;
         });  // end itemsNoRRule filter
+        console.log(itemsNoRRule);
+        let itemsNoRRule2 = itemsNoRRule.map(item => noRRuleAddOccurence(item)); 
 
-        // ;ut them together
+        // put them together
         
         let itemsOccurencesAdded = itemsAddOccurrences(itemsRRuleForExtrapolation);
 
-        let allShowTimesForFE = itemsNoRRule.concat(itemsOccurencesAdded);
+        let allShowTimesForFE = itemsNoRRule2.concat(itemsOccurencesAdded);
 
-        // map allShowTimesForFE to a new array of FE strings,
-        // map rawJSONdata.VCALENDAR and
-        ///////rawjSOndata.VEVENT to new data, return new JSONdata obj...
+        let calData = {
+            prevEarlyFilter: edFilterLDT.toISO(),
+            currEarlyFilter: edFilterLDT.toISO(),
+            nextEarlyFilter: ldFilterLDT.toISO(),
+            vcalendar: [
+                {
+                    calName: rawJSONdata.VCALENDAR[0]["X-WR-CALNAME"],
+                    timeZone: rawJSONdata.VCALENDAR[0]["X-WR-TIMEZONE"],
+                    vevent: allShowTimesForFE.map( item => this.formatVevent(item) )
+                }
+            ]
+        };
 
-        rawJSONdata.VCALENDAR[0].VEVENT = allShowTimesForFE;
-
-        return rawJSONdata;
+        return calData;
     }
 
 }
@@ -245,12 +310,6 @@ module.exports = new CALMAKER();
 // // // // RAWJSONDATA
 // {
 //   "id": "hhc1mfvhcajj77n5jcte1gq50s",
-//   "now": "2018-12-18T06:09:22.157Z",
-//   "timespan": {
-//     "unit": "m",
-//     "number": 4
-//   },
-//   "earliestdatefilter": "2018-12-18T06:09:22.157Z",
 //   "status": 200,
 //   "message": "OK",
 //   "calData": {

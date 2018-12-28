@@ -101,15 +101,12 @@ app.get('/cal', function (req,res) {
         let processedJSONdata = CALMAKER.processData(rawJSONdata,earliestdatefilter,tSpan,locale);
         let fGoogleResponse = {
             "id": calID,
-            "now": todayStr,
-            "timespan": tSpan,
-            "earliestdatefilter": earliestdatefilter.toISOString(),
             "status": GoogleResponse.statusCode,
             "message": GoogleResponse.statusMessage,
             "calData": processedJSONdata
         }
         let json = JSON.stringify(fGoogleResponse);
-        res.send(json);
+        res.jsonp(json);
     })
       .catch(function(reason){
         console.log(reason);
