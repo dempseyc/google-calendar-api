@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 const request = require('request');
 const ical2json = require('ical2json');
 const ipfilter = require('express-ipfilter').IpFilter;
@@ -115,5 +115,5 @@ app.get('/cal', function (req,res) {
 });
 
 const server = app.listen(port, function () {
-    console.log('listening on port 3000')
+    console.log('listening on port 8080')
 });
